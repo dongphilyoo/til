@@ -5,10 +5,9 @@
 Turn YouTube videos, articles, and text into structured notes in your Obsidian vault — powered by Claude.
 
 <div align="center">
-  <a href="https://github.com/dongphilyoo/til/releases/download/v0.1.0/demo.mp4">
-    <img src="docs/demo-thumbnail.jpg" alt="til demo video" width="720" />
-  </a>
-  <p><em>▶ Click to watch demo</em></p>
+
+https://github.com/user-attachments/assets/17fcf06c-46c5-4dba-8267-a8a0b90b7e98
+
 </div>
 
 Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, and connections, ready to browse in Obsidian.

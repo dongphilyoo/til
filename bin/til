@@ -1,0 +1,22 @@
+#!/bin/bash
+# Wrapper that ensures YouTube URLs with & are handled correctly
+# even when the user forgets to quote them.
+#
+# zsh splits `url?v=x&t=1s` into two args at `&`. This wrapper
+# detects the fragment (`t=1s`) and reassembles the URL before
+# passing it to the real script.
+
+SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/til.sh"
+
+if [[ "${1:-}" =~ ^https?:// ]]; then
+  URL="$1"
+  shift
+  # Reassemble fragments split by unquoted &
+  while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
+    URL="${URL}&${1}"
+    shift
+  done
+  exec "$SCRIPT" "$URL" "$@"
+else
+  exec "$SCRIPT" "$@"
+fi

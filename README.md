@@ -1,6 +1,12 @@
 # TIL
 
+> Read less. Remember more. Your Obsidian knowledge engine.
+
 Turn YouTube videos, articles, and text into structured notes in your Obsidian vault — powered by Claude.
+
+<div align="center">
+  <video src="https://github.com/dongphilyoo/til/raw/main/docs/demo.mp4" width="720" autoplay loop muted></video>
+</div>
 
 Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, and connections, ready to browse in Obsidian.
 

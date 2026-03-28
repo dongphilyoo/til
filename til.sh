@@ -337,14 +337,15 @@ elif [ "$MODE" = "article" ]; then
       ARTICLE_DATE=$(echo "$PAGE_HTML" | grep -oE 'article:published_time"[^"]*content="[^"]*"' | sed -E 's/.*content="([^"]*)".*/\1/' | head -1 | cut -c1-10 || true)
     fi
     if [ -z "$ARTICLE_DATE" ]; then
-      # Try common date patterns in body text (e.g., "Mar 24, 2026", "March 24, 2026", "2026-03-24")
-      ARTICLE_DATE=$(echo "$PAGE_HTML" | grep -oE '[A-Z][a-z]{2,8} [0-9]{1,2},? [0-9]{4}' | head -1 || true)
+      # Try common date patterns in body text
+      # "Mar 24, 2026", "March 24, 2026", "24 Mar 2026" (arXiv), "2026-03-24"
+      ARTICLE_DATE=$(echo "$PAGE_HTML" | grep -oE '[0-9]{1,2} [A-Z][a-z]{2,8} [0-9]{4}|[A-Z][a-z]{2,8} [0-9]{1,2},? [0-9]{4}' | head -1 || true)
       # Convert to YYYY-MM-DD
       if [ -n "$ARTICLE_DATE" ]; then
         ARTICLE_DATE=$(python3 -c "
 from datetime import datetime
 d='$ARTICLE_DATE'
-for fmt in ['%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']:
+for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']:
     try:
         print(datetime.strptime(d,fmt).strftime('%Y-%m-%d')); break
     except: pass

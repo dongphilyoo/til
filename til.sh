@@ -99,6 +99,25 @@ progress_complete() {
 # Cleanup on exit
 trap 'progress_stop' EXIT
 
+# --- Helper: clean claude output ---
+# Strips code fences and any preamble/postamble that claude sometimes adds
+clean_claude_output() {
+  local file="$1"
+  python3 -c "
+import re, sys
+text = open(sys.argv[1]).read()
+# Extract content from markdown code fence if present
+m = re.search(r'\`\`\`(?:markdown)?\s*\n(.*?)\n\`\`\`', text, re.DOTALL)
+if m:
+    text = m.group(1)
+# Strip anything before the first --- (frontmatter start)
+m = re.search(r'^(---\s*\n.*)', text, re.DOTALL | re.MULTILINE)
+if m:
+    text = m.group(1)
+open(sys.argv[1], 'w').write(text.strip() + '\n')
+" "$file"
+}
+
 # --- Helper: extract video ID from various YouTube URL formats ---
 extract_video_id() {
   local input="$1"
@@ -286,6 +305,7 @@ tags: [til, youtube, <add 2-4 relevant topic tags>]
 
 OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
 
+  clean_claude_output "$NOTE_PATH"
   progress_complete
   rm -f "$TRANSCRIPT_FILE"
 
@@ -401,6 +421,7 @@ tags: [<add 2-5 relevant topic tags>]
 
 OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
 
+  clean_claude_output "$NOTE_PATH"
   progress_complete
 
 # --- Text mode ---
@@ -493,6 +514,7 @@ tags: [<add 2-5 relevant topic tags>]
 
 OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
 
+  clean_claude_output "$NOTE_PATH"
   progress_complete
 fi
 

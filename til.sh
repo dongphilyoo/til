@@ -3,9 +3,9 @@
 #
 # Usage:
 #   til <youtube-url>                          ← YouTube video
-#   til -t "Title" [--url <source>]            ← paste text interactively, ctrl+D to finish
-#   pbpaste | til -t "Title" [--url <source>]  ← from clipboard
-#   til -t "Title" < file.txt                  ← from file
+#   til -t ["Title"] [--url <source>]           ← paste text interactively, ctrl+D to finish
+#   pbpaste | til -t ["Title"] [--url <source>] ← from clipboard
+#   til -t ["Title"] < file.txt                 ← from file
 
 set -euo pipefail
 
@@ -30,7 +30,8 @@ TIL_FOLDER="${TIL_FOLDER:-3-Resources/TIL}"
 TIL_DIR="$VAULT_DIR/$TIL_FOLDER"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TRANSCRIPT_DIR="$SCRIPT_DIR/.transcripts"
-TODAY=$(date +%Y-%m-%d)
+TODAY=$(date +%Y-%m-%dT%H:%M:%S%z | sed 's/\(..\)$/:\1/')
+TODAY_DATE=$(date +%Y-%m-%d)
 
 mkdir -p "$TIL_DIR" "$TRANSCRIPT_DIR"
 
@@ -145,8 +146,14 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     -t|--text)
       MODE="text"
-      TITLE="$2"
-      shift 2
+      # Title is optional — if next arg looks like a flag or is missing, skip it
+      if [[ -n "${2:-}" && ! "$2" =~ ^- ]]; then
+        TITLE="$2"
+        shift 2
+      else
+        TITLE=""
+        shift 1
+      fi
       ;;
     --url)
       SOURCE_URL="$2"
@@ -160,10 +167,11 @@ while [[ $# -gt 0 ]]; do
       echo "  til <video-id>                               YouTube by video ID"
       echo "  til <url>                                    YouTube or article (auto-detected)"
       echo "  til -t \"Title\"                               Text from clipboard (manual)"
+      echo "  til -t                                       Text from clipboard (auto-title)"
       echo "  til -t \"Title\" < file.txt                    Text from file"
       echo ""
       echo "Options:"
-      echo "  -t, --text <title>   Text mode — reads from clipboard by default"
+      echo "  -t, --text [title]   Text mode — reads from clipboard by default. Title auto-generated if omitted"
       echo "  -h, --help           Show this help"
       echo ""
       echo "Examples:"
@@ -171,6 +179,7 @@ while [[ $# -gt 0 ]]; do
       echo "  til pzUn9wTCgcw                              YouTube video ID"
       echo "  til https://example.com/some-article         Article URL"
       echo "  til -t \"Meeting Notes\"                       Clipboard text, manual title"
+      echo "  til -t                                       Clipboard text, auto-generated title"
       echo "  til -t \"Research Paper\" < paper.txt          Text file"
       echo ""
       echo "Notes are saved to: $TIL_DIR/"
@@ -252,11 +261,12 @@ if [ "$MODE" = "youtube" ]; then
   progress_complete
 
   SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
-  NOTE_PATH="$TIL_DIR/${TODAY}-${SAFE_TITLE}.md"
+  NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   progress_start "Summarizing with Claude Code..." 60
 
-  claude -p "You are creating a TIL (Today I Learned) note for an Obsidian vault.
+  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+You are creating a TIL (Today I Learned) note for an Obsidian vault.
 
 VIDEO METADATA:
 - Title: $TITLE
@@ -272,7 +282,7 @@ $(cat "$TRANSCRIPT_FILE")
 Create a detailed, academically rigorous yet easy-to-understand TIL note in this exact format:
 
 ---
-title: \"$TITLE\"
+title: "$TITLE"
 source: $SOURCE_URL
 channel: $CHANNEL
 date: $TODAY
@@ -303,7 +313,8 @@ tags: [til, youtube, <add 2-4 relevant topic tags>]
 ## Source Notes
 <any notable quotes, timestamps, or references mentioned in the video>
 
-OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
+CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+PROMPT
 
   clean_claude_output "$NOTE_PATH"
   progress_complete
@@ -370,11 +381,12 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
   fi
 
   SAFE_TITLE=$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
-  NOTE_PATH="$TIL_DIR/${TODAY}-${SAFE_TITLE}.md"
+  NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   progress_start "Summarizing with Claude Code..." 45
 
-  claude -p "You are creating a knowledge note for an Obsidian vault.
+  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+You are creating a knowledge note for an Obsidian vault.
 
 METADATA:
 - Title: $ARTICLE_TITLE
@@ -390,7 +402,7 @@ $ARTICLE_CONTENT
 Create a detailed, academically rigorous yet easy-to-understand note in this exact format:
 
 ---
-title: \"$ARTICLE_TITLE\"
+title: "$ARTICLE_TITLE"
 source: $SOURCE_URL
 date: $TODAY
 published: ${ARTICLE_DATE:-unknown}
@@ -420,7 +432,8 @@ tags: [<add 2-5 relevant topic tags>]
 ## Source Notes
 <any notable quotes or references from the article>
 
-OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
+CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+PROMPT
 
   clean_claude_output "$NOTE_PATH"
   progress_complete
@@ -467,15 +480,32 @@ elif [ "$MODE" = "text" ]; then
     SOURCE_LINE="- Source URL: $SOURCE_URL"
   fi
 
-  SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
-  NOTE_PATH="$TIL_DIR/${TODAY}-${SAFE_TITLE}.md"
+  # Build title-related prompt parts
+  if [ -n "$TITLE" ]; then
+    TITLE_META="- Title: $TITLE"
+    TITLE_FRONTMATTER="title: \"$TITLE\""
+    TITLE_HEADING="# $TITLE"
+  else
+    TITLE_META="- Title: NONE PROVIDED — you must generate a concise, descriptive title from the content"
+    TITLE_FRONTMATTER="title: \"GENERATE_TITLE_HERE\""
+    TITLE_HEADING="# GENERATE_TITLE_HERE"
+  fi
+
+  # Write to temp file first if we need to extract the title
+  if [ -n "$TITLE" ]; then
+    SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+    NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
+  else
+    NOTE_PATH="$TIL_DIR/${TODAY_DATE}-til-note-$$.md"
+  fi
 
   progress_start "Summarizing with Claude Code..." 45
 
-  claude -p "You are creating a knowledge note for an Obsidian vault.
+  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+You are creating a knowledge note for an Obsidian vault.
 
 METADATA:
-- Title: $TITLE
+$TITLE_META
 - Date: $TODAY
 $SOURCE_LINE
 
@@ -487,14 +517,14 @@ $INPUT
 Create a detailed, academically rigorous yet easy-to-understand note in this exact format:
 
 ---
-title: \"$TITLE\"
+$TITLE_FRONTMATTER
 source: ${SOURCE_URL:-manual}
 date: $TODAY
 type: ${SOURCE_URL:+article}${SOURCE_URL:-note}
 tags: [<add 2-5 relevant topic tags>]
 ---
 
-# $TITLE
+$TITLE_HEADING
 
 ## TL;DR
 <2-3 sentence plain-language summary>
@@ -513,10 +543,22 @@ tags: [<add 2-5 relevant topic tags>]
 ## Detailed Summary
 <thorough walkthrough organized by topic. Use subheadings (###) if it covers multiple distinct topics. Be detailed and precise but explain jargon in parentheses when first used>
 
-OUTPUT ONLY THE MARKDOWN NOTE CONTENT, nothing else." > "$NOTE_PATH"
+CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+PROMPT
 
   clean_claude_output "$NOTE_PATH"
   progress_complete
+
+  # If title was auto-generated, extract it and rename the file
+  if [ -z "$TITLE" ]; then
+    TITLE=$(sed -n 's/^title: *"\(.*\)"/\1/p' "$NOTE_PATH" | head -1)
+    if [ -n "$TITLE" ]; then
+      SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+      NEW_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
+      mv "$NOTE_PATH" "$NEW_PATH"
+      NOTE_PATH="$NEW_PATH"
+    fi
+  fi
 fi
 
 echo ""

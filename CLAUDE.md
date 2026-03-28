@@ -24,7 +24,8 @@ til/
 - `til` — auto-detect clipboard URL (YouTube or article)
 - `til <video-id>` — YouTube by video ID
 - `til <url>` — YouTube or article (auto-detected)
-- `til -t "Title"` — clipboard text (manual)
+- `til -t "Title"` — clipboard text (manual title)
+- `til -t` — clipboard text (auto-generated title from content)
 - `til -t "Title" < file.txt` — text from file
 - Uses `claude -p` (CLI, no API cost) for summarization
 - Uses `yt-dlp` for YouTube transcripts
@@ -40,9 +41,11 @@ til/
 7. Source Notes
 
 ## Frontmatter Properties
-- YouTube notes: title, source, channel, date, published (Date type), type: youtube, tags
-- Article notes: title, source, date, published (Date type, "unknown" if unavailable), type: article, tags
-- Text notes: title, source (manual), date, type: note, tags
+- `date` uses ISO 8601 with timezone (e.g. `2026-03-28T15:12:40+09:00`)
+- `published` stays plain YYYY-MM-DD (source's date, not user's timezone)
+- YouTube notes: title, source, channel, date, published, type: youtube, tags
+- Article notes: title, source, date, published ("unknown" if unavailable), type: article, tags
+- Text notes: title (optional, auto-generated if omitted), source ("manual"), date, type: note, tags
 
 ## Principles
 - Claude Code is the summarization engine — no API usage, everything runs through the CLI

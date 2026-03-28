@@ -48,6 +48,9 @@ til https://example.com/interesting-article
 # Text from clipboard (manual title)
 til -t "Meeting Notes"
 
+# Text from clipboard (auto-generated title)
+til -t
+
 # Text from file
 til -t "Research Paper" < paper.txt
 ```
@@ -63,7 +66,7 @@ Each note is saved to your vault's TIL folder with this structure:
 5. **Detailed Summary** — thorough deep-dive
 6. **Source Notes** — quotes, timestamps, references
 
-Notes include frontmatter with metadata (source, date, type, tags) for Obsidian's graph view and search.
+Notes include frontmatter with metadata (source, date with timezone, type, tags) for Obsidian's graph view and search.
 
 ## Config
 

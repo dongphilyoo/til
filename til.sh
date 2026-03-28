@@ -276,7 +276,7 @@ title: \"$TITLE\"
 source: $SOURCE_URL
 channel: $CHANNEL
 date: $TODAY
-video_date: $VIDEO_DATE
+published: $VIDEO_DATE
 type: youtube
 tags: [til, youtube, <add 2-4 relevant topic tags>]
 ---
@@ -393,7 +393,7 @@ Create a detailed, academically rigorous yet easy-to-understand note in this exa
 title: \"$ARTICLE_TITLE\"
 source: $SOURCE_URL
 date: $TODAY
-article_date: ${ARTICLE_DATE:-unknown}
+published: ${ARTICLE_DATE:-unknown}
 type: article
 tags: [<add 2-5 relevant topic tags>]
 ---

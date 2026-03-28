@@ -40,8 +40,8 @@ til/
 7. Source Notes
 
 ## Frontmatter Properties
-- YouTube notes: title, source, channel, date, video_date (Date type), type: youtube, tags
-- Article notes: title, source, date, article_date (Date type, "unknown" if unavailable), type: article, tags
+- YouTube notes: title, source, channel, date, published (Date type), type: youtube, tags
+- Article notes: title, source, date, published (Date type, "unknown" if unavailable), type: article, tags
 - Text notes: title, source (manual), date, type: note, tags
 
 ## Principles

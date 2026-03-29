@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/17fcf06c-46c5-4dba-8267-a8a0b90b7e98
 
 </div>
 
-Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, and connections, ready to browse in Obsidian.
+Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, and connections, ready to browse in Obsidian. Works with videos of any length — long transcripts are automatically chunked and summarized using map-reduce.
 
 ## Prerequisites
 

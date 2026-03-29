@@ -27,7 +27,7 @@ cd til
 ```
 
 The setup script will:
-- Install `yt-dlp` (YouTube transcripts) and `trafilatura` (article extraction) via Homebrew
+- Install `yt-dlp` (YouTube transcripts, English & Korean) and `trafilatura` (article extraction) via Homebrew
 - Ask for your Obsidian vault path
 - Add `til` to your PATH
 

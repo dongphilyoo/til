@@ -28,7 +28,7 @@ til/
 - `til -t` — clipboard text (auto-generated title from content)
 - `til -t "Title" < file.txt` — text from file
 - Uses `claude -p --tools ""` (CLI, no API cost) for summarization
-- Uses `yt-dlp` for YouTube transcripts
+- Uses `yt-dlp` for YouTube transcripts (English and Korean)
 - Uses `trafilatura` for article content extraction
 - Long transcripts (>100K chars) use map-reduce: chunk → summarize each → combine into one note
 

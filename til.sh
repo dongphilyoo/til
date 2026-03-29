@@ -242,7 +242,8 @@ if [ "$MODE" = "youtube" ]; then
 
   progress_start "Fetching transcript..." 15
   # Try each language separately — yt-dlp aborts all downloads if any one language fails
-  for _lang in "ko-orig" "ko" "en"; do
+  # Use -orig variants first (original language subs are higher quality than auto-translated)
+  for _lang in "ko-orig" "en-orig" "ko" "en"; do
     yt-dlp --write-subs --write-auto-subs --sub-langs "$_lang" \
       --skip-download --output "$TRANSCRIPT_DIR/${VIDEO_ID}" "$SOURCE_URL" >/dev/null 2>&1
     SUB_FILE=$(find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" -type f | head -1)

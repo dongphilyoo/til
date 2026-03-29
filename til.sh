@@ -240,16 +240,18 @@ if [ "$MODE" = "youtube" ]; then
   fi
 
   progress_start "Fetching transcript..." 15
-  yt-dlp --write-subs --write-auto-subs --sub-langs "en.*,ko.*" \
-    --skip-download --output "$TRANSCRIPT_DIR/${VIDEO_ID}" "$SOURCE_URL" >/dev/null 2>&1
-
-  # Find subtitle file (could be .vtt, .srt, .txt, etc.)
-  SUB_FILE=$(find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" -type f | head -1)
+  # Try each language separately — yt-dlp aborts all downloads if any one language fails
+  for _lang in "ko-orig" "ko" "en"; do
+    yt-dlp --write-subs --write-auto-subs --sub-langs "$_lang" \
+      --skip-download --output "$TRANSCRIPT_DIR/${VIDEO_ID}" "$SOURCE_URL" >/dev/null 2>&1
+    SUB_FILE=$(find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" -type f | head -1)
+    [ -n "$SUB_FILE" ] && break
+  done
 
   if [ -z "$SUB_FILE" ]; then
     progress_stop
     echo ""
-    echo "❌ No transcript found for this video (tried English and Korean)."
+    echo "❌ No transcript found for this video (tried Korean and English)."
     exit 1
   fi
 

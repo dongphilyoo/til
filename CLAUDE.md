@@ -28,8 +28,8 @@ til/
 - `til -t` — clipboard text (auto-generated title from content)
 - `til -t "Title" < file.txt` — text from file
 - Uses `claude -p --tools ""` (CLI, no API cost) for summarization
-- Uses `yt-dlp` for YouTube transcripts (Korean preferred, English fallback; tried separately to avoid yt-dlp aborting on per-language failures)
-- Uses `trafilatura` for article content extraction
+- Uses `yt-dlp` for YouTube transcripts (Korean preferred, English fallback; tried separately to avoid yt-dlp aborting on per-language failures) and video descriptions (for external links)
+- Uses `trafilatura` for article content extraction (text + inline URLs)
 - Long transcripts (>100K chars) use map-reduce: chunk → summarize each → combine into one note
 
 ## Note Format (priority order for reading)
@@ -39,7 +39,7 @@ til/
 4. Connections (wikilinks)
 5. --- (divider)
 6. Detailed Summary (deep dive, read if needed)
-7. Source Notes
+7. Source Notes (quotes, timestamps, and relevant external links)
 
 ## Frontmatter Properties
 - `date` uses ISO 8601 with timezone (e.g. `2026-03-28T15:12:40+09:00`)

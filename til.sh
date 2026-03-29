@@ -230,6 +230,7 @@ if [ "$MODE" = "youtube" ]; then
   VIDEO_DATE_RAW=$(yt-dlp --no-download --print "%(upload_date)s" "$SOURCE_URL" 2>/dev/null)
   VIDEO_DATE=$(echo "$VIDEO_DATE_RAW" | sed 's/\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)/\1-\2-\3/')
   VIDEO_ID=$(yt-dlp --no-download --print "%(id)s" "$SOURCE_URL" 2>/dev/null)
+  DESCRIPTION=$(yt-dlp --no-download --print "%(description)s" "$SOURCE_URL" 2>/dev/null)
   progress_complete
 
   echo "📺 $TITLE — $CHANNEL"
@@ -281,6 +282,9 @@ VIDEO METADATA:
 - Upload Date: $VIDEO_DATE
 - URL: $SOURCE_URL
 
+VIDEO DESCRIPTION:
+$DESCRIPTION
+
 TRANSCRIPT:
 $(cat "$TRANSCRIPT_FILE")
 
@@ -318,7 +322,11 @@ tags: [til, youtube, <add 2-4 relevant topic tags>]
 <thorough walkthrough of the video's content, organized by topic. Use subheadings (###) if the video covers multiple distinct topics. Be detailed and precise but explain jargon in parentheses when first used>
 
 ## Source Notes
-<any notable quotes, timestamps, or references mentioned in the video>
+<any notable quotes, timestamps, or references mentioned in the video.
+Also include any relevant external links from the video description or transcript.
+Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
+Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
+Format links as: - [descriptive title](URL) — one-line context>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
 __TIL_EOF__
@@ -359,6 +367,7 @@ Extract ALL key information from this chunk. Include:
 - Specific examples, tools, or techniques mentioned
 - Notable quotes or statements
 - Any actionable advice or recommendations
+- Any external URLs or links mentioned
 
 Be thorough and detailed. This summary will be combined with other chunks to create a final note.
 Output ONLY the summary content, no preamble.
@@ -380,6 +389,9 @@ VIDEO METADATA:
 - Channel: $CHANNEL
 - Upload Date: $VIDEO_DATE
 - URL: $SOURCE_URL
+
+VIDEO DESCRIPTION:
+$DESCRIPTION
 
 CHUNK SUMMARIES:
 $(cat "$SUMMARIES_FILE")
@@ -418,7 +430,11 @@ tags: [til, youtube, <add 2-4 relevant topic tags>]
 <thorough walkthrough of the video's content, organized by topic. Use subheadings (###) for each major topic. Be detailed and precise but explain jargon in parentheses when first used. Cover ALL topics from ALL chunks.>
 
 ## Source Notes
-<any notable quotes, timestamps, or references mentioned>
+<any notable quotes, timestamps, or references mentioned.
+Also include any relevant external links from the video description or chunk summaries.
+Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
+Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
+Format links as: - [descriptive title](URL) — one-line context>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
 __TIL_EOF__
@@ -447,6 +463,13 @@ elif [ "$MODE" = "article" ]; then
   ARTICLE_CONTENT=$(echo "$ARTICLE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('text',''))" 2>/dev/null)
   ARTICLE_TITLE=$(echo "$ARTICLE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('title',''))" 2>/dev/null)
   ARTICLE_DATE=$(echo "$ARTICLE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('date',''))" 2>/dev/null)
+  ARTICLE_LINKS=$(echo "$ARTICLE_JSON" | python3 -c "
+import sys, json, re
+data = json.load(sys.stdin)
+text = data.get('text', '')
+urls = list(dict.fromkeys(re.findall(r'https?://[^\s)\]>\"]+', text)))
+print('\n'.join(urls))
+" 2>/dev/null)
 
   # Fallback: extract title and date from HTML meta tags / body if trafilatura missed them
   if [ -z "$ARTICLE_TITLE" ] || [ -z "$ARTICLE_DATE" ]; then
@@ -505,6 +528,9 @@ METADATA:
 - Article Date: ${ARTICLE_DATE:-unknown}
 - Date: $TODAY
 
+LINKS FOUND IN ARTICLE:
+$ARTICLE_LINKS
+
 ARTICLE CONTENT:
 $ARTICLE_CONTENT
 
@@ -541,7 +567,11 @@ tags: [<add 2-5 relevant topic tags>]
 <thorough walkthrough organized by topic. Use subheadings (###) if it covers multiple distinct topics. Be detailed and precise but explain jargon in parentheses when first used>
 
 ## Source Notes
-<any notable quotes or references from the article>
+<any notable quotes or references from the article.
+Also include any relevant external links found in the article.
+Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
+Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
+Format links as: - [descriptive title](URL) — one-line context>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
 __TIL_EOF__

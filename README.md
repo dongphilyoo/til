@@ -10,7 +10,7 @@ https://github.com/user-attachments/assets/17fcf06c-46c5-4dba-8267-a8a0b90b7e98
 
 </div>
 
-Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, and connections, ready to browse in Obsidian. Works with videos of any length — long transcripts are automatically chunked and summarized using map-reduce.
+Copy a URL, run `til`, and get a detailed TIL note with a TL;DR, key takeaways, concepts, connections, and relevant external links — ready to browse in Obsidian. Works with videos of any length — long transcripts are automatically chunked and summarized using map-reduce.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ Each note is saved to your vault's TIL folder with this structure:
 3. **Key Concepts** — main ideas with explanations
 4. **Connections** — Obsidian `[[wikilinks]]` to related topics
 5. **Detailed Summary** — thorough deep-dive
-6. **Source Notes** — quotes, timestamps, references
+6. **Source Notes** — quotes, timestamps, references, and relevant external links
 
 Notes include frontmatter with metadata (source, date with timezone, type, tags) for Obsidian's graph view and search.
 

@@ -263,9 +263,14 @@ if [ "$MODE" = "youtube" ]; then
   SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
   NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
-  progress_start "Summarizing with Claude Code..." 60
+  TRANSCRIPT_SIZE=$(wc -c < "$TRANSCRIPT_FILE")
+  MAX_CHUNK=100000
 
-  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+  if [ "$TRANSCRIPT_SIZE" -le "$MAX_CHUNK" ]; then
+    # --- Single-call path (short transcripts) ---
+    progress_start "Summarizing with Claude Code..." 60
+
+    claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
 You are creating a TIL (Today I Learned) note for an Obsidian vault.
 
 VIDEO METADATA:
@@ -314,7 +319,111 @@ tags: [til, youtube, <add 2-4 relevant topic tags>]
 <any notable quotes, timestamps, or references mentioned in the video>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
-PROMPT
+__TIL_EOF__
+
+  else
+    # --- Map-reduce path (long transcripts) ---
+    NUM_CHUNKS=$(( (TRANSCRIPT_SIZE + MAX_CHUNK - 1) / MAX_CHUNK ))
+    echo "📏 Large transcript ($(( TRANSCRIPT_SIZE / 1000 ))K chars) — splitting into $NUM_CHUNKS chunks"
+
+    # Split transcript into chunks
+    CHUNK_DIR="$TRANSCRIPT_DIR/${VIDEO_ID}_chunks"
+    mkdir -p "$CHUNK_DIR"
+    split -b ${MAX_CHUNK} "$TRANSCRIPT_FILE" "$CHUNK_DIR/chunk_"
+
+    # Map: summarize each chunk
+    SUMMARIES_FILE="$TRANSCRIPT_DIR/${VIDEO_ID}_summaries.txt"
+    > "$SUMMARIES_FILE"
+    CHUNK_NUM=0
+    CHUNK_FILES=("$CHUNK_DIR"/chunk_*)
+
+    for CHUNK_FILE in "${CHUNK_FILES[@]}"; do
+      CHUNK_NUM=$((CHUNK_NUM + 1))
+      progress_start "Summarizing chunk $CHUNK_NUM/$NUM_CHUNKS..." 30
+
+      claude -p --tools "" <<__TIL_EOF__ >> "$SUMMARIES_FILE"
+You are summarizing part $CHUNK_NUM of $NUM_CHUNKS of a video transcript.
+
+VIDEO: $TITLE by $CHANNEL
+
+TRANSCRIPT CHUNK $CHUNK_NUM/$NUM_CHUNKS:
+$(cat "$CHUNK_FILE")
+
+---
+
+Extract ALL key information from this chunk. Include:
+- Main topics and arguments discussed
+- Important concepts, definitions, or frameworks introduced
+- Specific examples, tools, or techniques mentioned
+- Notable quotes or statements
+- Any actionable advice or recommendations
+
+Be thorough and detailed. This summary will be combined with other chunks to create a final note.
+Output ONLY the summary content, no preamble.
+__TIL_EOF__
+
+      printf "\n\n---CHUNK_BOUNDARY---\n\n" >> "$SUMMARIES_FILE"
+      progress_complete
+    done
+
+    # Reduce: combine all chunk summaries into final note
+    progress_start "Combining into final note..." 45
+
+    claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
+You are creating a TIL (Today I Learned) note for an Obsidian vault.
+The note is based on summaries from a long video, split into $NUM_CHUNKS parts.
+
+VIDEO METADATA:
+- Title: $TITLE
+- Channel: $CHANNEL
+- Upload Date: $VIDEO_DATE
+- URL: $SOURCE_URL
+
+CHUNK SUMMARIES:
+$(cat "$SUMMARIES_FILE")
+
+---
+
+Synthesize ALL the chunk summaries above into a single, cohesive TIL note. Make sure no key information is lost. Use this exact format:
+
+---
+title: "$TITLE"
+source: $SOURCE_URL
+channel: $CHANNEL
+date: $TODAY
+published: $VIDEO_DATE
+type: youtube
+tags: [til, youtube, <add 2-4 relevant topic tags>]
+---
+
+# <concise descriptive title>
+
+## TL;DR
+<2-3 sentence plain-language summary that anyone could understand>
+
+## Key Takeaways
+<numbered list of the most important things to remember>
+
+## Key Concepts
+<bullet points of the main ideas/concepts covered, with brief explanations>
+
+## Connections
+<suggest 2-3 related topics or questions this connects to, formatted as Obsidian wikilinks like [[Topic Name]]. These help build the knowledge graph>
+
+---
+
+## Detailed Summary
+<thorough walkthrough of the video's content, organized by topic. Use subheadings (###) for each major topic. Be detailed and precise but explain jargon in parentheses when first used. Cover ALL topics from ALL chunks.>
+
+## Source Notes
+<any notable quotes, timestamps, or references mentioned>
+
+CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+__TIL_EOF__
+
+    # Cleanup temp files
+    rm -rf "$CHUNK_DIR" "$SUMMARIES_FILE"
+  fi
 
   clean_claude_output "$NOTE_PATH"
   progress_complete
@@ -385,7 +494,7 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
 
   progress_start "Summarizing with Claude Code..." 45
 
-  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+  claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
 You are creating a knowledge note for an Obsidian vault.
 
 METADATA:
@@ -433,7 +542,7 @@ tags: [<add 2-5 relevant topic tags>]
 <any notable quotes or references from the article>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
-PROMPT
+__TIL_EOF__
 
   clean_claude_output "$NOTE_PATH"
   progress_complete
@@ -501,7 +610,7 @@ elif [ "$MODE" = "text" ]; then
 
   progress_start "Summarizing with Claude Code..." 45
 
-  claude -p --tools "" <<PROMPT > "$NOTE_PATH"
+  claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
 You are creating a knowledge note for an Obsidian vault.
 
 METADATA:
@@ -544,7 +653,7 @@ $TITLE_HEADING
 <thorough walkthrough organized by topic. Use subheadings (###) if it covers multiple distinct topics. Be detailed and precise but explain jargon in parentheses when first used>
 
 CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
-PROMPT
+__TIL_EOF__
 
   clean_claude_output "$NOTE_PATH"
   progress_complete

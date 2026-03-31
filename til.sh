@@ -141,6 +141,7 @@ extract_video_id() {
 MODE=""
 TITLE=""
 SOURCE_URL=""
+AUTO_YES=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -159,6 +160,10 @@ while [[ $# -gt 0 ]]; do
       SOURCE_URL="$2"
       shift 2
       ;;
+    -y|--yes)
+      AUTO_YES=true
+      shift
+      ;;
     -h|--help)
       echo "til — Capture knowledge into your Obsidian vault"
       echo ""
@@ -172,6 +177,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  -t, --text [title]   Text mode — reads from clipboard by default. Title auto-generated if omitted"
+      echo "  -y, --yes            Skip confirmation prompts"
       echo "  -h, --help           Show this help"
       echo ""
       echo "Examples:"
@@ -234,10 +240,12 @@ if [ "$MODE" = "youtube" ]; then
   progress_complete
 
   echo "📺 $TITLE — $CHANNEL"
-  read -rp "Proceed? [Y/n] " CONFIRM
-  if [[ "$CONFIRM" =~ ^[Nn] ]]; then
-    echo "Cancelled."
-    exit 0
+  if [ "$AUTO_YES" = false ]; then
+    read -rp "Proceed? [Y/n] " CONFIRM
+    if [[ "$CONFIRM" =~ ^[Nn] ]]; then
+      echo "Cancelled."
+      exit 0
+    fi
   fi
 
   progress_start "Fetching transcript..." 15
@@ -509,10 +517,12 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
   PREVIEW=$(echo "$ARTICLE_CONTENT" | head -c 80)
   echo "📄 $ARTICLE_TITLE"
   echo "   $CHAR_COUNT chars from: $SOURCE_URL"
-  read -rp "Proceed? [Y/n] " CONFIRM
-  if [[ "$CONFIRM" =~ ^[Nn] ]]; then
-    echo "Cancelled."
-    exit 0
+  if [ "$AUTO_YES" = false ]; then
+    read -rp "Proceed? [Y/n] " CONFIRM
+    if [[ "$CONFIRM" =~ ^[Nn] ]]; then
+      echo "Cancelled."
+      exit 0
+    fi
   fi
 
   SAFE_TITLE=$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
@@ -591,7 +601,7 @@ elif [ "$MODE" = "text" ]; then
     fi
     # Check if clipboard has a YouTube URL instead of article text
     ACCIDENTAL_ID=$(extract_video_id "$INPUT")
-    if [ -n "$ACCIDENTAL_ID" ] && [ ${#INPUT} -lt 200 ]; then
+    if [ -n "$ACCIDENTAL_ID" ] && [ ${#INPUT} -lt 200 ] && [ "$AUTO_YES" = false ]; then
       echo "⚠️  Clipboard looks like a YouTube URL. Did you mean to run 'til' instead?"
       read -rp "Continue as text anyway? [y/N] " CONFIRM
       if [[ ! "$CONFIRM" =~ ^[Yy] ]]; then
@@ -602,10 +612,12 @@ elif [ "$MODE" = "text" ]; then
     CHAR_COUNT=${#INPUT}
     PREVIEW=$(echo "$INPUT" | head -c 80)
     echo "📋 Read $CHAR_COUNT chars from clipboard: \"${PREVIEW}...\""
-    read -rp "Proceed? [Y/n] " CONFIRM
-    if [[ "$CONFIRM" =~ ^[Nn] ]]; then
-      echo "Cancelled."
-      exit 0
+    if [ "$AUTO_YES" = false ]; then
+      read -rp "Proceed? [Y/n] " CONFIRM
+      if [[ "$CONFIRM" =~ ^[Nn] ]]; then
+        echo "Cancelled."
+        exit 0
+      fi
     fi
   else
     # Piped input

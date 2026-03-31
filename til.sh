@@ -245,7 +245,7 @@ if [ "$MODE" = "youtube" ]; then
   # English first (primary), Korean as fallback; -orig variants preferred (higher quality)
   for _lang in "en-orig" "en" "ko-orig" "ko"; do
     yt-dlp --write-subs --write-auto-subs --sub-langs "$_lang" \
-      --skip-download --output "$TRANSCRIPT_DIR/${VIDEO_ID}" "$SOURCE_URL" >/dev/null 2>&1
+      --skip-download --output "$TRANSCRIPT_DIR/${VIDEO_ID}" "$SOURCE_URL" >/dev/null 2>&1 || true
     SUB_FILE=$(find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" -type f | head -1)
     [ -n "$SUB_FILE" ] && break
   done
@@ -264,7 +264,7 @@ if [ "$MODE" = "youtube" ]; then
   find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" ! -name "*.txt" -delete 2>/dev/null
   progress_complete
 
-  SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+  SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
   NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   TRANSCRIPT_SIZE=$(wc -c < "$TRANSCRIPT_FILE")
@@ -515,7 +515,7 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
     exit 0
   fi
 
-  SAFE_TITLE=$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+  SAFE_TITLE=$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
   NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   progress_start "Summarizing with Claude Code..." 45
@@ -635,7 +635,7 @@ elif [ "$MODE" = "text" ]; then
 
   # Write to temp file first if we need to extract the title
   if [ -n "$TITLE" ]; then
-    SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+    SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
     NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
   else
     NOTE_PATH="$TIL_DIR/${TODAY_DATE}-til-note-$$.md"
@@ -695,7 +695,7 @@ __TIL_EOF__
   if [ -z "$TITLE" ]; then
     TITLE=$(sed -n 's/^title: *"\(.*\)"/\1/p' "$NOTE_PATH" | head -1)
     if [ -n "$TITLE" ]; then
-      SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | head -c 100)
+      SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
       NEW_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
       mv "$NOTE_PATH" "$NEW_PATH"
       NOTE_PATH="$NEW_PATH"

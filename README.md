@@ -53,6 +53,10 @@ til -t
 
 # Text from file
 til -t "Research Paper" < paper.txt
+
+# Skip confirmation prompt
+til -y
+til -y https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 ## Note Format

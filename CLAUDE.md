@@ -27,8 +27,9 @@ til/
 - `til -t "Title"` — clipboard text (manual title)
 - `til -t` — clipboard text (auto-generated title from content)
 - `til -t "Title" < file.txt` — text from file
+- `til -y` / `til --yes` — skip confirmation prompts (combinable with any mode)
 - Uses `claude -p --tools ""` (CLI, no API cost) for summarization
-- Uses `yt-dlp` for YouTube transcripts (fallback: en-orig → en → ko-orig → ko; tried separately to avoid yt-dlp aborting on per-language failures) and video descriptions (for external links)
+- Uses `yt-dlp` for YouTube transcripts (fallback: en-orig → en → ko-orig → ko; tried separately with `|| true` to avoid both yt-dlp aborting on per-language failures and `set -e` killing the script) and video descriptions (for external links)
 - Uses `trafilatura` for article content extraction (text + inline URLs)
 - Long transcripts (>100K chars) use map-reduce: chunk → summarize each → combine into one note
 

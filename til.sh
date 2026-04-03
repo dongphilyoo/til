@@ -459,7 +459,15 @@ __TIL_EOF__
 # --- Article mode ---
 elif [ "$MODE" = "article" ]; then
   progress_start "Fetching article..." 10
-  ARTICLE_JSON=$(trafilatura -u "$SOURCE_URL" --json 2>/dev/null)
+  ARTICLE_JSON=$(trafilatura -u "$SOURCE_URL" --json 2>/dev/null || true)
+
+  # Fallback: some sites (e.g. brunch.co.kr) block trafilatura's URL fetcher
+  # but work fine when HTML is piped via curl
+  PAGE_HTML=""
+  if [ -z "$ARTICLE_JSON" ]; then
+    PAGE_HTML=$(curl -sL "$SOURCE_URL" 2>/dev/null)
+    ARTICLE_JSON=$(echo "$PAGE_HTML" | trafilatura --json 2>/dev/null || true)
+  fi
 
   if [ -z "$ARTICLE_JSON" ]; then
     progress_stop
@@ -482,7 +490,7 @@ print('\n'.join(urls))
 
   # Fallback: extract title and date from HTML meta tags / body if trafilatura missed them
   if [ -z "$ARTICLE_TITLE" ] || [ -z "$ARTICLE_DATE" ]; then
-    PAGE_HTML=$(curl -sL "$SOURCE_URL" 2>/dev/null)
+    [ -z "$PAGE_HTML" ] && PAGE_HTML=$(curl -sL "$SOURCE_URL" 2>/dev/null)
     if [ -z "$ARTICLE_TITLE" ]; then
       ARTICLE_TITLE=$(echo "$PAGE_HTML" | grep -oE 'og:title"[^"]*content="[^"]*"' | sed -E 's/.*content="([^"]*)".*/\1/' | head -1 || true)
     fi

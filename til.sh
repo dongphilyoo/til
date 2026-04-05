@@ -119,6 +119,60 @@ open(sys.argv[1], 'w').write(text.strip() + '\n')
 " "$file"
 }
 
+# --- Helper: validate note has frontmatter ---
+# Returns 0 if valid (starts with ---), 1 if broken
+validate_note() {
+  local file="$1"
+  local first_line
+  IFS= read -r first_line < "$file"
+  [[ "$first_line" == "---" ]]
+}
+
+# --- Helper: repair broken note output ---
+# Re-prompts Claude with the broken output + frontmatter template to fix formatting
+repair_note() {
+  local file="$1"
+  local frontmatter_hint="$2"
+  local broken_content
+  broken_content=$(cat "$file")
+
+  progress_stop
+  progress_start "Repairing note format..." 30
+
+  claude -p --tools "" <<__REPAIR_EOF__ > "$file"
+YOUR TASK: The text in <broken_output> was supposed to be an Obsidian note but the formatting is wrong. Reformat it into a proper note.
+
+OUTPUT FORMAT — use this frontmatter and section structure:
+
+\`\`\`
+$frontmatter_hint
+
+# <title>
+## TL;DR
+## Key Takeaways
+## Key Concepts
+## Connections (use [[wikilinks]])
+---
+## Detailed Summary
+## Source Notes
+\`\`\`
+
+Output ONLY the raw markdown note starting with the --- frontmatter opener. No commentary, no preamble, no code fences around your output.
+
+<broken_output>
+$broken_content
+</broken_output>
+__REPAIR_EOF__
+
+  clean_claude_output "$file"
+
+  if ! validate_note "$file"; then
+    echo ""
+    echo "❌ Failed to generate a valid note after retry."
+    exit 1
+  fi
+}
+
 # --- Helper: extract video ID from various YouTube URL formats ---
 extract_video_id() {
   local input="$1"
@@ -283,24 +337,11 @@ if [ "$MODE" = "youtube" ]; then
     progress_start "Summarizing with Claude Code..." 60
 
     claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
-You are creating a TIL (Today I Learned) note for an Obsidian vault.
+YOUR TASK: Create a TIL (Today I Learned) Obsidian note from the video content below.
 
-VIDEO METADATA:
-- Title: $TITLE
-- Channel: $CHANNEL
-- Upload Date: $VIDEO_DATE
-- URL: $SOURCE_URL
+OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
-VIDEO DESCRIPTION:
-$DESCRIPTION
-
-TRANSCRIPT:
-$(cat "$TRANSCRIPT_FILE")
-
----
-
-Create a detailed, academically rigorous yet easy-to-understand TIL note in this exact format:
-
+\`\`\`
 ---
 title: "$TITLE"
 source: $SOURCE_URL
@@ -336,8 +377,26 @@ Also include any relevant external links from the video description or transcrip
 Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
 Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
 Format links as: - [descriptive title](URL) — one-line context>
+\`\`\`
 
-CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+IMPORTANT: The note should be detailed and academically rigorous, but written in plain, accessible language. Output ONLY the raw markdown note starting with the --- frontmatter opener. No commentary, no preamble, no code fences around your output.
+
+<source_content>
+<video_metadata>
+Title: $TITLE
+Channel: $CHANNEL
+Upload Date: $VIDEO_DATE
+URL: $SOURCE_URL
+</video_metadata>
+
+<video_description>
+$DESCRIPTION
+</video_description>
+
+<transcript>
+$(cat "$TRANSCRIPT_FILE")
+</transcript>
+</source_content>
 __TIL_EOF__
 
   else
@@ -390,25 +449,11 @@ __TIL_EOF__
     progress_start "Combining into final note..." 45
 
     claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
-You are creating a TIL (Today I Learned) note for an Obsidian vault.
-The note is based on summaries from a long video, split into $NUM_CHUNKS parts.
+YOUR TASK: Synthesize ALL the chunk summaries below into a single, cohesive TIL (Today I Learned) Obsidian note. Make sure no key information is lost.
 
-VIDEO METADATA:
-- Title: $TITLE
-- Channel: $CHANNEL
-- Upload Date: $VIDEO_DATE
-- URL: $SOURCE_URL
+OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
-VIDEO DESCRIPTION:
-$DESCRIPTION
-
-CHUNK SUMMARIES:
-$(cat "$SUMMARIES_FILE")
-
----
-
-Synthesize ALL the chunk summaries above into a single, cohesive TIL note. Make sure no key information is lost. Use this exact format:
-
+\`\`\`
 ---
 title: "$TITLE"
 source: $SOURCE_URL
@@ -444,8 +489,26 @@ Also include any relevant external links from the video description or chunk sum
 Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
 Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
 Format links as: - [descriptive title](URL) — one-line context>
+\`\`\`
 
-CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+IMPORTANT: The note should be detailed and academically rigorous, but written in plain, accessible language. Output ONLY the raw markdown note starting with the --- frontmatter opener. No commentary, no preamble, no code fences around your output.
+
+<source_content>
+<video_metadata>
+Title: $TITLE
+Channel: $CHANNEL
+Upload Date: $VIDEO_DATE
+URL: $SOURCE_URL
+</video_metadata>
+
+<video_description>
+$DESCRIPTION
+</video_description>
+
+<chunk_summaries>
+$(cat "$SUMMARIES_FILE")
+</chunk_summaries>
+</source_content>
 __TIL_EOF__
 
     # Cleanup temp files
@@ -453,6 +516,20 @@ __TIL_EOF__
   fi
 
   clean_claude_output "$NOTE_PATH"
+  if ! validate_note "$NOTE_PATH"; then
+    repair_note "$NOTE_PATH" "$(cat <<HINT
+---
+title: "$TITLE"
+source: $SOURCE_URL
+channel: $CHANNEL
+date: $TODAY
+published: $VIDEO_DATE
+type: youtube
+tags: [til, youtube, ...]
+---
+HINT
+)"
+  fi
   progress_complete
   rm -f "$TRANSCRIPT_FILE"
 
@@ -522,7 +599,6 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
   progress_complete
 
   CHAR_COUNT=${#ARTICLE_CONTENT}
-  PREVIEW=$(echo "$ARTICLE_CONTENT" | head -c 80)
   echo "📄 $ARTICLE_TITLE"
   echo "   $CHAR_COUNT chars from: $SOURCE_URL"
   if [ "$AUTO_YES" = false ]; then
@@ -539,24 +615,11 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
   progress_start "Summarizing with Claude Code..." 45
 
   claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
-You are creating a knowledge note for an Obsidian vault.
+YOUR TASK: Create a knowledge note for an Obsidian vault from the article content below.
 
-METADATA:
-- Title: $ARTICLE_TITLE
-- Source URL: $SOURCE_URL
-- Article Date: ${ARTICLE_DATE:-unknown}
-- Date: $TODAY
+OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
-LINKS FOUND IN ARTICLE:
-$ARTICLE_LINKS
-
-ARTICLE CONTENT:
-$ARTICLE_CONTENT
-
----
-
-Create a detailed, academically rigorous yet easy-to-understand note in this exact format:
-
+\`\`\`
 ---
 title: "$ARTICLE_TITLE"
 source: $SOURCE_URL
@@ -591,11 +654,42 @@ Also include any relevant external links found in the article.
 Include: tools, libraries, papers, documentation, related articles, GitHub repos, datasets.
 Exclude: sponsor links, course/product ads, social media profiles, subscription/newsletter links, affiliate/merch links.
 Format links as: - [descriptive title](URL) — one-line context>
+\`\`\`
 
-CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+IMPORTANT: The note should be detailed and academically rigorous, but written in plain, accessible language. Output ONLY the raw markdown note starting with the --- frontmatter opener. No commentary, no preamble, no code fences around your output.
+
+<source_content>
+<article_metadata>
+Title: $ARTICLE_TITLE
+Source URL: $SOURCE_URL
+Article Date: ${ARTICLE_DATE:-unknown}
+Date: $TODAY
+</article_metadata>
+
+<article_links>
+$ARTICLE_LINKS
+</article_links>
+
+<article_text>
+$ARTICLE_CONTENT
+</article_text>
+</source_content>
 __TIL_EOF__
 
   clean_claude_output "$NOTE_PATH"
+  if ! validate_note "$NOTE_PATH"; then
+    repair_note "$NOTE_PATH" "$(cat <<HINT
+---
+title: "$ARTICLE_TITLE"
+source: $SOURCE_URL
+date: $TODAY
+published: ${ARTICLE_DATE:-unknown}
+type: article
+tags: [...]
+---
+HINT
+)"
+  fi
   progress_complete
 
 # --- Text mode ---
@@ -664,20 +758,11 @@ elif [ "$MODE" = "text" ]; then
   progress_start "Summarizing with Claude Code..." 45
 
   claude -p --tools "" <<__TIL_EOF__ > "$NOTE_PATH"
-You are creating a knowledge note for an Obsidian vault.
+YOUR TASK: Create a knowledge note for an Obsidian vault from the text below.
 
-METADATA:
-$TITLE_META
-- Date: $TODAY
-$SOURCE_LINE
+OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
-SOURCE TEXT:
-$INPUT
-
----
-
-Create a detailed, academically rigorous yet easy-to-understand note in this exact format:
-
+\`\`\`
 ---
 $TITLE_FRONTMATTER
 source: ${SOURCE_URL:-manual}
@@ -704,11 +789,36 @@ $TITLE_HEADING
 
 ## Detailed Summary
 <thorough walkthrough organized by topic. Use subheadings (###) if it covers multiple distinct topics. Be detailed and precise but explain jargon in parentheses when first used>
+\`\`\`
 
-CRITICAL: Output ONLY the raw markdown note starting with --- frontmatter. Do NOT add any commentary before or after the note. Just print the markdown.
+IMPORTANT: The note should be detailed and academically rigorous, but written in plain, accessible language. Output ONLY the raw markdown note starting with the --- frontmatter opener. No commentary, no preamble, no code fences around your output.
+
+<source_content>
+<text_metadata>
+$TITLE_META
+Date: $TODAY
+$SOURCE_LINE
+</text_metadata>
+
+<source_text>
+$INPUT
+</source_text>
+</source_content>
 __TIL_EOF__
 
   clean_claude_output "$NOTE_PATH"
+  if ! validate_note "$NOTE_PATH"; then
+    repair_note "$NOTE_PATH" "$(cat <<HINT
+---
+title: "${TITLE:-GENERATE_TITLE_HERE}"
+source: ${SOURCE_URL:-manual}
+date: $TODAY
+type: ${SOURCE_URL:+article}${SOURCE_URL:-note}
+tags: [...]
+---
+HINT
+)"
+  fi
   progress_complete
 
   # If title was auto-generated, extract it and rename the file

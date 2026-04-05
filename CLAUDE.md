@@ -32,6 +32,8 @@ til/
 - Uses `yt-dlp` for YouTube transcripts (fallback: en-orig → en → ko-orig → ko; tried separately with `|| true` to avoid both yt-dlp aborting on per-language failures and `set -e` killing the script) and video descriptions (for external links)
 - Uses `trafilatura` for article content extraction (text + inline URLs); falls back to `curl | trafilatura` when the URL fetcher fails (e.g. brunch.co.kr)
 - Long transcripts (>100K chars) use map-reduce: chunk → summarize each → combine into one note
+- Prompts use instructions-first ordering with XML-tagged source content (`<source_content>`, `<transcript>`, etc.) to prevent Claude from confusing video content with output format — especially for meta-topics like Obsidian/Claude Code
+- `validate_note` + `repair_note` fallback: if Claude output lacks frontmatter, a repair pass re-prompts with the broken content + frontmatter hint
 
 ## Note Format (priority order for reading)
 1. TL;DR

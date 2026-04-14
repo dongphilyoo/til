@@ -173,6 +173,26 @@ __REPAIR_EOF__
   fi
 }
 
+# --- Helper: safe filename truncation ---
+# macOS stores filenames in NFD (decomposed) form on iCloud Drive, which
+# inflates each Korean syllable from 3 to 6-9 bytes. The 255-byte filename
+# limit truncates silently at creation, breaking downstream path lookups.
+# Budget: 255 - 11 (YYYY-MM-DD-) - 3 (.md) = 241 bytes for the title itself.
+safe_title_trunc() {
+  python3 -c '
+import unicodedata, sys
+title = sys.argv[1]
+budget = 241
+out, total = [], 0
+for ch in title:
+    n = len(unicodedata.normalize("NFD", ch).encode("utf-8"))
+    if total + n > budget:
+        break
+    out.append(ch); total += n
+sys.stdout.write("".join(out))
+' "$1"
+}
+
 # --- Helper: extract video ID from various YouTube URL formats ---
 extract_video_id() {
   local input="$1"
@@ -326,7 +346,7 @@ if [ "$MODE" = "youtube" ]; then
   find "$TRANSCRIPT_DIR" -name "${VIDEO_ID}*" ! -name "*.txt" -delete 2>/dev/null
   progress_complete
 
-  SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
+  SAFE_TITLE=$(safe_title_trunc "$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g')")
   NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   TRANSCRIPT_SIZE=$(wc -c < "$TRANSCRIPT_FILE")
@@ -609,7 +629,7 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
     fi
   fi
 
-  SAFE_TITLE=$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
+  SAFE_TITLE=$(safe_title_trunc "$(echo "$ARTICLE_TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g')")
   NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
 
   progress_start "Summarizing with Claude Code..." 45
@@ -749,7 +769,7 @@ elif [ "$MODE" = "text" ]; then
 
   # Write to temp file first if we need to extract the title
   if [ -n "$TITLE" ]; then
-    SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
+    SAFE_TITLE=$(safe_title_trunc "$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g')")
     NOTE_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
   else
     NOTE_PATH="$TIL_DIR/${TODAY_DATE}-til-note-$$.md"
@@ -825,7 +845,7 @@ HINT
   if [ -z "$TITLE" ]; then
     TITLE=$(sed -n 's/^title: *"\(.*\)"/\1/p' "$NOTE_PATH" | head -1)
     if [ -n "$TITLE" ]; then
-      SAFE_TITLE=$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g' | cut -c1-100)
+      SAFE_TITLE=$(safe_title_trunc "$(echo "$TITLE" | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/  */ /g')")
       NEW_PATH="$TIL_DIR/${TODAY_DATE}-${SAFE_TITLE}.md"
       mv "$NOTE_PATH" "$NEW_PATH"
       NOTE_PATH="$NEW_PATH"

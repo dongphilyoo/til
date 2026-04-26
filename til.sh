@@ -119,13 +119,37 @@ open(sys.argv[1], 'w').write(text.strip() + '\n')
 " "$file"
 }
 
-# --- Helper: validate note has frontmatter ---
-# Returns 0 if valid (starts with ---), 1 if broken
+# --- Helper: escape a string for use inside a YAML double-quoted scalar ---
+# Escapes backslashes first, then double quotes.
+yaml_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+# --- Helper: validate note has parseable frontmatter ---
+# Checks that the file opens with ---, has a closing ---, and that every
+# double-quoted scalar in the frontmatter has balanced unescaped quotes.
+# Catches unescaped " inside title:, which yields YAML that Obsidian can't read.
 validate_note() {
   local file="$1"
-  local first_line
-  IFS= read -r first_line < "$file"
-  [[ "$first_line" == "---" ]]
+  python3 - "$file" <<'PYEOF'
+import re, sys
+lines = open(sys.argv[1]).read().split('\n')
+if not lines or lines[0] != '---':
+    sys.exit(1)
+try:
+    end = lines.index('---', 1)
+except ValueError:
+    sys.exit(1)
+for line in lines[1:end]:
+    if not line.strip() or ':' not in line:
+        continue
+    val = line.split(':', 1)[1].strip()
+    if val.startswith('"'):
+        cleaned = re.sub(r'\\.', '', val)
+        if cleaned.count('"') != 2 or not cleaned.endswith('"'):
+            sys.exit(1)
+sys.exit(0)
+PYEOF
 }
 
 # --- Helper: repair broken note output ---
@@ -306,6 +330,7 @@ fi
 if [ "$MODE" = "youtube" ]; then
   progress_start "Fetching video metadata..." 8
   TITLE=$(yt-dlp --no-download --print "%(title)s" "$SOURCE_URL" 2>/dev/null)
+  TITLE_YAML=$(yaml_escape "$TITLE")
   CHANNEL=$(yt-dlp --no-download --print "%(channel)s" "$SOURCE_URL" 2>/dev/null)
   VIDEO_DATE_RAW=$(yt-dlp --no-download --print "%(upload_date)s" "$SOURCE_URL" 2>/dev/null)
   VIDEO_DATE=$(echo "$VIDEO_DATE_RAW" | sed 's/\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)/\1-\2-\3/')
@@ -363,7 +388,7 @@ OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
 \`\`\`
 ---
-title: "$TITLE"
+title: "$TITLE_YAML"
 source: $SOURCE_URL
 channel: $CHANNEL
 date: $TODAY
@@ -475,7 +500,7 @@ OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
 \`\`\`
 ---
-title: "$TITLE"
+title: "$TITLE_YAML"
 source: $SOURCE_URL
 channel: $CHANNEL
 date: $TODAY
@@ -539,7 +564,7 @@ __TIL_EOF__
   if ! validate_note "$NOTE_PATH"; then
     repair_note "$NOTE_PATH" "$(cat <<HINT
 ---
-title: "$TITLE"
+title: "$TITLE_YAML"
 source: $SOURCE_URL
 channel: $CHANNEL
 date: $TODAY
@@ -616,6 +641,7 @@ for fmt in ['%d %b %Y','%d %B %Y','%b %d, %Y','%b %d %Y','%B %d, %Y','%B %d %Y']
   if [ -z "$ARTICLE_TITLE" ]; then
     ARTICLE_TITLE=$(echo "$SOURCE_URL" | sed -E 's|https?://[^/]+/||; s|[/-]| |g; s|\.html?||g' | head -c 80)
   fi
+  ARTICLE_TITLE_YAML=$(yaml_escape "$ARTICLE_TITLE")
   progress_complete
 
   CHAR_COUNT=${#ARTICLE_CONTENT}
@@ -641,7 +667,7 @@ OUTPUT FORMAT — you MUST produce this exact structure and nothing else:
 
 \`\`\`
 ---
-title: "$ARTICLE_TITLE"
+title: "$ARTICLE_TITLE_YAML"
 source: $SOURCE_URL
 date: $TODAY
 published: ${ARTICLE_DATE:-unknown}
@@ -700,7 +726,7 @@ __TIL_EOF__
   if ! validate_note "$NOTE_PATH"; then
     repair_note "$NOTE_PATH" "$(cat <<HINT
 ---
-title: "$ARTICLE_TITLE"
+title: "$ARTICLE_TITLE_YAML"
 source: $SOURCE_URL
 date: $TODAY
 published: ${ARTICLE_DATE:-unknown}
@@ -758,8 +784,9 @@ elif [ "$MODE" = "text" ]; then
 
   # Build title-related prompt parts
   if [ -n "$TITLE" ]; then
+    TITLE_YAML=$(yaml_escape "$TITLE")
     TITLE_META="- Title: $TITLE"
-    TITLE_FRONTMATTER="title: \"$TITLE\""
+    TITLE_FRONTMATTER="title: \"$TITLE_YAML\""
     TITLE_HEADING="# $TITLE"
   else
     TITLE_META="- Title: NONE PROVIDED — you must generate a concise, descriptive title from the content"
@@ -830,7 +857,7 @@ __TIL_EOF__
   if ! validate_note "$NOTE_PATH"; then
     repair_note "$NOTE_PATH" "$(cat <<HINT
 ---
-title: "${TITLE:-GENERATE_TITLE_HERE}"
+title: "${TITLE_YAML:-GENERATE_TITLE_HERE}"
 source: ${SOURCE_URL:-manual}
 date: $TODAY
 type: ${SOURCE_URL:+article}${SOURCE_URL:-note}
